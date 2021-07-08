@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white"
+    android:padding="10dp">
+
+    <ImageView
+        android:id="@+id/iv_location"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_bet_shop_location"
+        app:layout_constraintEnd_toStartOf="@+id/tv_name"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintHorizontal_chainStyle="spread_inside"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:ignore="ContentDescription" />
+
+    <TextView
+        android:id="@+id/tv_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:text="Name"
+        app:layout_constraintEnd_toStartOf="@+id/btn_close"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintHorizontal_weight="10"
+        app:layout_constraintStart_toEndOf="@+id/iv_location"
+        app:layout_constraintTop_toTopOf="@+id/iv_location"
+        tools:text="Name" />
+
+    <TextView
+        android:id="@+id/tv_adress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Adress"
+        app:layout_constraintStart_toStartOf="@+id/tv_name"
+        app:layout_constraintTop_toBottomOf="@+id/tv_name"
+        tools:text="Adress" />
+
+    <TextView
+        android:id="@+id/tv_city"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="City"
+        app:layout_constraintStart_toStartOf="@+id/tv_adress"
+        app:layout_constraintTop_toBottomOf="@+id/tv_adress"
+        tools:text="City" />
+
+    <TextView
+        android:id="@+id/tv_minus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=" - "
+        app:layout_constraintBaseline_toBaselineOf="@+id/tv_city"
+        app:layout_constraintStart_toEndOf="@+id/tv_city"
+        tools:text=" - " />
+
+    <TextView
+        android:id="@+id/tv_county"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="County"
+        app:layout_constraintBaseline_toBaselineOf="@+id/tv_city"
+        app:layout_constraintStart_toEndOf="@+id/tv_minus"
+        tools:text="County" />
+
+    <ImageView
+        android:id="@+id/iv_phone"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_bet_shop_phone"
+        app:layout_constraintBottom_toBottomOf="@+id/tv_phone"
+        app:layout_constraintEnd_toEndOf="@+id/iv_location"
+        app:layout_constraintStart_toStartOf="@+id/iv_location"
+        app:layout_constraintTop_toTopOf="@+id/tv_phone" />
+
+    <TextView
+        android:id="@+id/tv_phone"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="123-456"
+        app:layout_constraintStart_toStartOf="@+id/tv_city"
+        app:layout_constraintTop_toBottomOf="@+id/tv_city"
+        tools:text="123-156" />
+
+    <ImageView
+        android:id="@+id/iv_hours"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_bet_shop_hours"
+        app:layout_constraintBottom_toBottomOf="@+id/tv_hours"
+        app:layout_constraintEnd_toEndOf="@+id/iv_phone"
+        app:layout_constraintStart_toStartOf="@+id/iv_phone"
+        app:layout_constraintTop_toTopOf="@+id/tv_hours" />
+
+    <TextView
+        android:id="@+id/tv_hours"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        app:layout_constraintStart_toStartOf="@+id/tv_phone"
+        app:layout_constraintTop_toBottomOf="@+id/tv_phone"
+        tools:text="Open now" />
+
+
+    <ImageButton
+        android:id="@+id/btn_close"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/close_black"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintHorizontal_weight="1"
+        android:scaleType="fitCenter"
+        app:layout_constraintStart_toEndOf="@+id/tv_name"
+        app:layout_constraintTop_toTopOf="@+id/tv_name"
+        tools:ignore="ContentDescription" />
+
+    <ImageButton
+        android:id="@+id/btn_route"
+        android:background="@drawable/route_dark"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:visibility="visible"
+        app:layout_constraintStart_toStartOf="@+id/tv_hours"
+        app:layout_constraintTop_toBottomOf="@+id/tv_hours"
+         />
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>
