@@ -29,8 +29,9 @@ object PermissionUtils {
         ) {
             if (ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)) {
                 // Display a dialog with rationale.
-                RationaleDialog.newInstance(requestId, finishActivity)
-                    .show(activity.supportFragmentManager, "dialog")
+                val rd: RationaleDialog = RationaleDialog.newInstance(requestId, finishActivity)
+                rd.isCancelable = false
+                rd.show(activity.supportFragmentManager, "dialog")
             } else {
                 // Location permission has not been granted yet, request it.
                 ActivityCompat.requestPermissions(
@@ -121,8 +122,8 @@ object PermissionUtils {
                 finishActivity =
                     arguments?.getBoolean(ARGUMENT_FINISH_ACTIVITY) ?: false
                 return AlertDialog.Builder(activity)
-                    .setCancelable(false)   // todo ovo je dodano
                     .setMessage("Betshop needs your permission to access your location. If denied, default location will be set")
+                    .setCancelable(false)   // todo ovo ne radi
                     .setPositiveButton(android.R.string.ok) { dialog, which -> // After click on Ok, request the permission.
                         ActivityCompat.requestPermissions(
                             requireActivity(),

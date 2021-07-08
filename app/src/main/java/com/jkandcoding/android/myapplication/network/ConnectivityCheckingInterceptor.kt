@@ -30,7 +30,7 @@ class ConnectivityCheckingInterceptor @Inject constructor(
         if (online) {
             return chain.proceed(chain.request())
         } else {
-          //  Toast.makeText(, "", Toast.LENGTH_SHORT).show()
+           // Toast.makeText(get, "", Toast.LENGTH_SHORT).show()
             throw IOException("Internet connection is unavailable")
         }
     }

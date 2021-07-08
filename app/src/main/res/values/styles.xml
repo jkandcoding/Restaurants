@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
     <style name="FlatButton" parent="Theme.AppCompat.Light">
         <item name="android:textColor">@color/purple_700</item>
         <item name="colorControlHighlight">@color/purple_200</item>
-   </style>
+    </style>
+
+    <style name="infoWindowTextStyle">
+        <item name="android:textSize">16sp</item>
+    </style>
+
 </resources>
+

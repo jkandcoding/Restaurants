@@ -18,4 +18,17 @@
             android:layout_height="match_parent"
             tools:context=".ui.MapsActivity" />
     </com.jkandcoding.android.myapplication.ui.MapWrapperLayout>
+
+    <Button
+        android:id="@+id/btn_retry"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@color/purple_700"
+        android:textColor="@color/white"
+        android:layout_gravity="end|top"
+        android:visibility="gone"
+        tools:visibility="visible"
+        android:text="Retry" />
+
+
 </FrameLayout>

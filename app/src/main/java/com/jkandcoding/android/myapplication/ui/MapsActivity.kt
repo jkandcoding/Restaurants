@@ -3,6 +3,7 @@ package com.jkandcoding.android.myapplication.ui
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
@@ -12,12 +13,12 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.app.ActivityCompat.OnRequestPermissionsResultCallback
@@ -44,7 +45,8 @@ import kotlin.random.Random
 
 @AndroidEntryPoint
 class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, OnMapReadyCallback,
-    GoogleMap.OnCameraIdleListener, GoogleMap.OnInfoWindowCloseListener, GoogleMap.OnMarkerClickListener {
+    GoogleMap.OnCameraIdleListener, GoogleMap.OnInfoWindowCloseListener,
+    GoogleMap.OnMarkerClickListener {
 
     private val viewModel: BetshopsViewModel by viewModels()
     private lateinit var binding: ActivityMapsBinding
@@ -71,10 +73,9 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
 
     // infoWindow
     private var infoWindow: ViewGroup? = null
-    private var infoWindowButtonListener: OnInfoWindowElemTouchListener? = null
+    private var infoWindowButtonListenerRoute: OnInfoWindowElemTouchListener? = null
     private var infoWindowButtonListenerClose: OnInfoWindowElemTouchListener? = null
 
-    // private var infoWindowButtonListenerClose: OnInfoWindowElemTouchListener? = null
     private lateinit var btn_route: ImageButton
     private lateinit var btn_close: ImageButton
     private lateinit var tv_name: TextView
@@ -138,6 +139,9 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
 
         getBetshopsFromApi()
 
+        binding.btnRetry.setOnClickListener {
+            getBetshopsFromApi()
+        }
     }
 
 
@@ -191,7 +195,7 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
 
 
 
-        this.infoWindowButtonListener = object : OnInfoWindowElemTouchListener(
+        this.infoWindowButtonListenerRoute = object : OnInfoWindowElemTouchListener(
             btn_route,
             ContextCompat.getDrawable(this, R.drawable.route_dark),
             ContextCompat.getDrawable(this, R.drawable.route_pressed_light)
@@ -206,19 +210,37 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
                 )
                 Log.d("infoWindow", "onClickConfirmed, navigate to: ${marker?.position}")
                 Log.d("infoWindow", "onClickConfirmed, navigate to: " + marker?.position)
+
+
                 // Here we can perform some action triggered after clicking the button
                 val lat = marker?.position?.latitude
                 val lon = marker?.position?.longitude
-                val gmmIntentUri = Uri.parse("google.navigation:q=${lat},${lon}")
-                val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
-                mapIntent.resolveActivity(packageManager)?.let {
-                    startActivity(mapIntent)
+
+                val url = "waze://?ll=" + lat + ", " + lon + "&navigate=yes"
+                val intentWaze = Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage("com.waze")
+
+                val uriGoogle = "google.navigation:q=" + lat + "," + lon
+                val intentGoogleNav = Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse(uriGoogle)
+                ).setPackage("com.google.android.apps.maps")
+
+                val title: String = this@MapsActivity.getString(R.string.app_name)
+                val chooserIntent = Intent.createChooser(intentGoogleNav, title)
+                val arr = arrayOfNulls<Intent>(1)
+                arr[0] = intentWaze
+                chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, arr)
+                chooserIntent.resolveActivity(packageManager)?.let {
+                    startActivity(chooserIntent)
                 }
+
+
+
                 Toast.makeText(this@MapsActivity, "click on button 1", Toast.LENGTH_SHORT).show()
             }
 
         }
-        btn_route.setOnTouchListener(infoWindowButtonListener)
+        btn_route.setOnTouchListener(infoWindowButtonListenerRoute)
 
 
         infoWindowButtonListenerClose = object : OnInfoWindowElemTouchListener(
@@ -250,7 +272,7 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
 
                 marker.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.ic_pin_active))
 
-                (infoWindowButtonListener as OnInfoWindowElemTouchListener).setMarker(marker)
+                (infoWindowButtonListenerRoute as OnInfoWindowElemTouchListener).setMarker(marker)
                 (infoWindowButtonListenerClose as OnInfoWindowElemTouchListener).setMarker(marker)
                 Log.d(
                     "infoWindow",
@@ -276,7 +298,12 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
 
                     if (germanNowTime.isAfter(START_TIME) && germanNowTime.isBefore(END_TIME)) {
                         tv_hours.text = "Open now until " + END_TIME.hour + "h"
-                        tv_hours.setTextColor(resources.getColor(R.color.teal_200))
+                        tv_hours.setTextColor(
+                            ContextCompat.getColor(
+                                this@MapsActivity,
+                                R.color.teal_200
+                            )
+                        )
                     } else {
                         tv_hours.text = "Opens tomorrow at " + START_TIME.hour + "h"
                     }
@@ -362,7 +389,15 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
                         "permitted user location, but didn't get it, - ne bi se trebalo desit"
                     )
                 }
+                Log.d(
+                    "lokacija",
+                    "userova lokacija4 - " + lastKnownLocation
+                )
             }
+            Log.d(
+                "lokacija",
+                "userova lokacija5 -  " + lastKnownLocation
+            )
         } else {
             // Permission to access the location is missing. Show rationale and request permission
             requestPermission(
@@ -437,6 +472,7 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
         viewModel.res.observe(this, { betshopResource ->
             when (betshopResource.status) {
                 Status.SUCCESS -> {
+                    binding.btnRetry.visibility = View.GONE
                     Log.d("hghgh", "activity success")
                     Log.d(
                         "hghgh",
@@ -487,14 +523,20 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
                 Status.LOADING -> {
                     // nothing here
                     Log.d("hghgh", "activity loading")
+                    binding.btnRetry.visibility = View.GONE
                 }
                 Status.ERROR -> {
                     //todo set visibilities
-                    Toast.makeText(
-                        this,
-                        "Can't provide data - " + betshopResource.message,
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    binding.btnRetry.visibility = View.VISIBLE
+
+                    val noInternetAlertDialog = AlertDialog.Builder(this)
+                    noInternetAlertDialog.setMessage("Can't provide data - " + betshopResource.message)
+                        .setPositiveButton(android.R.string.ok) { dialog, id ->
+                            dialog.cancel()
+                        }
+                    val alert = noInternetAlertDialog.create()
+                    alert.show()
+
                     Log.d("hghgh", "activity error; allBetshops are hardcoded")
                     Log.d("hghgh", "activity error -> " + betshopResource.message)
                 }
