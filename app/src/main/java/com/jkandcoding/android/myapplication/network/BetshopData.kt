@@ -2,7 +2,6 @@ package com.jkandcoding.android.myapplication.network
 
 import com.google.android.gms.maps.model.LatLng
 
-
 data class BetshopData(
     val name: String,
     val address: String,

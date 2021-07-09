@@ -9,7 +9,6 @@ import okhttp3.Response
 import java.io.IOException
 import javax.inject.Inject
 
-
 class ConnectivityCheckingInterceptor @Inject constructor(
     private val connectivityManager: ConnectivityManager
 ) : Interceptor, ConnectivityManager.NetworkCallback() {
@@ -30,12 +29,11 @@ class ConnectivityCheckingInterceptor @Inject constructor(
         if (online) {
             return chain.proceed(chain.request())
         } else {
-           // Toast.makeText(get, "", Toast.LENGTH_SHORT).show()
             throw IOException("Internet connection is unavailable")
         }
     }
 
     override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-       online = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        online = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 }

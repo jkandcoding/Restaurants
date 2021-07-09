@@ -1,7 +1,9 @@
 package com.jkandcoding.android.myapplication.ui
 
-import android.util.Log
-import androidx.lifecycle.*
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.jkandcoding.android.myapplication.BetshopsRepository
 import com.jkandcoding.android.myapplication.network.BetshopResponse
 import com.jkandcoding.android.myapplication.other.Resource
@@ -12,7 +14,6 @@ import javax.inject.Inject
 
 @HiltViewModel
 class BetshopsViewModel @Inject constructor(
-    private val savedStateHandle: SavedStateHandle,
     private val repository: BetshopsRepository
 ) : ViewModel() {
 
@@ -26,7 +27,6 @@ class BetshopsViewModel @Inject constructor(
         try {
             _res.postValue(Resource.loading(null))
             repository.getBetshops(latLonMapView).let {
-                Log.d("hghgh", "viewModel response: " + it.code())
                 if (it.isSuccessful) {
                     _res.postValue(Resource.success(it.body()))
                 } else {
@@ -34,7 +34,6 @@ class BetshopsViewModel @Inject constructor(
                 }
             }
         } catch (e: IOException) {
-            Log.d("hghgh", "viewModel IOException: " + e)
             _res.postValue(Resource.error(e.localizedMessage, null))
             e.printStackTrace()
         }
@@ -42,7 +41,6 @@ class BetshopsViewModel @Inject constructor(
 
     fun setLanLonMapView(latLonMapViewFromActivity: String) {
         this.latLonMapView = latLonMapViewFromActivity
-        Log.d("hghgh", "viewModel-set: boundingBox: " + latLonMapView)
         getBetshops(latLonMapView)
     }
 

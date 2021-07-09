@@ -1,4 +1,10 @@
 <resources>
     <string name="app_name">Betshops</string>
     <string name="title_activity_maps">Betshops</string>
+    <string name="open_now">Open now until %1$d h</string>
+    <string name="opens_tomorrow">Opens tomorrow at %1$d h</string>
+    <string name="no_current_location_found">No current location found</string>
+    <string name="betshops_are_set">Betshops are set</string>
+    <string name="empty_betshop_list">Empty list - no data provided</string>
+    <string name="cant_provide_data">Can\'t provide data - %1$s</string>
 </resources>

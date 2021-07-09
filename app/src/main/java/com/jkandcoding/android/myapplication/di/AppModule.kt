@@ -2,7 +2,6 @@ package com.jkandcoding.android.myapplication.di
 
 import android.content.Context
 import android.net.ConnectivityManager
-import androidx.core.content.ContextCompat
 import com.jkandcoding.android.myapplication.network.BetshopsApi
 import com.jkandcoding.android.myapplication.network.ConnectivityCheckingInterceptor
 import dagger.Module
@@ -18,13 +17,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 
-//object ConnectivityManager {
-//    @Provides
-//    fun provideConnectivityManager(
-//        @ApplicationContext context: Context
-//    ) = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-//}
-
 object AppModule {
 
     @Provides
@@ -33,9 +25,11 @@ object AppModule {
         Retrofit.Builder()
             .baseUrl(BetshopsApi.BASE_URL)
             .addConverterFactory(GsonConverterFactory.create())
-            .client(OkHttpClient.Builder()
-                .addInterceptor(ConnectivityCheckingInterceptor(connectivityManager))
-                .build())
+            .client(
+                OkHttpClient.Builder()
+                    .addInterceptor(ConnectivityCheckingInterceptor(connectivityManager))
+                    .build()
+            )
             .build()
 
     @Provides

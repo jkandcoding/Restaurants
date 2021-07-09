@@ -9,15 +9,12 @@ import android.location.Location
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.app.ActivityCompat.OnRequestPermissionsResultCallback
@@ -33,7 +30,6 @@ import com.google.android.gms.maps.model.*
 import com.google.android.material.snackbar.Snackbar
 import com.jkandcoding.android.myapplication.R
 import com.jkandcoding.android.myapplication.databinding.ActivityMapsBinding
-import com.jkandcoding.android.myapplication.map.PermissionUtils.PermissionUtils.PermissionDeniedDialog.Companion.newInstance
 import com.jkandcoding.android.myapplication.map.PermissionUtils.PermissionUtils.isPermissionGranted
 import com.jkandcoding.android.myapplication.map.PermissionUtils.PermissionUtils.requestPermission
 import com.jkandcoding.android.myapplication.network.BetshopData
@@ -55,20 +51,21 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
     private lateinit var mMap: GoogleMap
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
 
-
-    // The geographical location where the device is currently located. That is, the last-known
-    // location retrieved by the Fused Location Provider.
-//    private var lastKnownLocation: Location? =
-//        null // can't be lateinit because of saveInstanceState
-    private lateinit var lastKnownLocation: Location
-
     // betshops
+    // all betshops in Germany
     private var allBetshops: ArrayList<BetshopData> = arrayListOf()
-    private val shownBetshops = ArrayList<BetshopData>()
+
+    // betshops that currently have marker on the map (for whole Germany)
+    private val shownBetshops: ArrayList<BetshopData> = arrayListOf()
+
+    // betshops whose locations are inside current boundingBox; the list is set after OnCameraIdle()
     private var newList: ArrayList<BetshopData> = arrayListOf()
 
-    // markers
+    // betshops which already have markers on current boundingBox
     private var markersOnCurrentScreen: ArrayList<BetshopData> = arrayListOf()
+
+    // markers
+    // list of all markers which are set on the map (for whole Germany)
     private var markersArray: ArrayList<Marker> = arrayListOf()
 
     // infoWindow
@@ -76,15 +73,14 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
     private var infoWindowButtonListenerRoute: OnInfoWindowElemTouchListener? = null
     private var infoWindowButtonListenerClose: OnInfoWindowElemTouchListener? = null
 
-    private lateinit var btn_route: ImageButton
-    private lateinit var btn_close: ImageButton
-    private lateinit var tv_name: TextView
-    private lateinit var tv_adress: TextView
-    private lateinit var tv_city: TextView
-    private lateinit var tv_county: TextView
-    private lateinit var tv_phone: TextView
-    private lateinit var tv_hours: TextView
-
+    private lateinit var btnRoute: ImageButton
+    private lateinit var btnClose: ImageButton
+    private lateinit var tvName: TextView
+    private lateinit var tvAdress: TextView
+    private lateinit var tvCity: TextView
+    private lateinit var tvCounty: TextView
+    private lateinit var tvPhone: TextView
+    private lateinit var tvHours: TextView
 
     companion object {
         /**
@@ -93,13 +89,13 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
          */
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1
 
-        //        private const val READ_EX_STORAGE_PERMISSION_REQUEST_CODE = 2
-//        private const val WRITE_EX_STORAGE_PERMISSION_REQUEST_CODE = 3
         private const val DEFAULT_ZOOM = 15
         private const val GERMANY_BOUNDING_BOX = "55.099161,15.0419319,47.2701114,5.8663153"
 
         // Munich:
         private val DEFAULT_LOCATION = LatLng(48.137154, 11.576124)
+
+        // for making the marker not clickable
         private const val USER_TAG = "userMarker"
 
         // numbers of markers showed on screen based on zoom level
@@ -109,23 +105,20 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
         private const val zoom6_7 = 10
         private const val zoom7_14 = 15
 
-        // time
+        // java.time
         @RequiresApi(Build.VERSION_CODES.O)
-        private val germanOffset = ZoneOffset.ofHours(2)
+        private val GERMAN_OFFSET = ZoneOffset.ofHours(2)
 
         @RequiresApi(Build.VERSION_CODES.O)
-        private val START_TIME: OffsetTime = LocalTime.of(8, 0).atOffset(germanOffset)
+        private val START_TIME: OffsetTime = LocalTime.of(8, 0).atOffset(GERMAN_OFFSET)
 
         @RequiresApi(Build.VERSION_CODES.O)
-        private val END_TIME: OffsetTime = LocalTime.of(16, 0).atOffset(germanOffset)
+        private val END_TIME: OffsetTime = LocalTime.of(16, 0).atOffset(GERMAN_OFFSET)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-//        if (savedInstanceState != null) {
-//            lastKnownLocation = savedInstanceState.getParcelable(KEY_LOCATION)
-//            cameraPosition = savedInstanceState.getParcelable(KEY_CAMERA_POSITION)
-//        }
+
         binding = ActivityMapsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -134,7 +127,6 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map_fragment) as SupportMapFragment
-
         mapFragment.getMapAsync(this)
 
         getBetshopsFromApi()
@@ -143,15 +135,6 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
             getBetshopsFromApi()
         }
     }
-
-
-//    override fun onSaveInstanceState(outState: Bundle) {
-//        mMap.let { mMap ->
-//            outState.putParcelable(KEY_CAMERA_POSITION, mMap.cameraPosition)
-//            outState.putParcelable(KEY_LOCATION, lastKnownLocation)
-//        }
-//        super.onSaveInstanceState(outState)
-//    }
 
     /**
      * Manipulates the map once available.
@@ -166,58 +149,118 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
         mMap.uiSettings.isMapToolbarEnabled = false
-        // mMap.setOnMarkerClickListener(mClusterManager)
+        mMap.uiSettings.isZoomControlsEnabled = true
 
+        mMap.setOnCameraIdleListener(this)
+        mMap.setOnMarkerClickListener(this)
+        mMap.setOnInfoWindowCloseListener(this)
+
+        initInfoWindowElements()
+        setUserLocation()
+        setListenerOnInfoWindowRouteBtn()
+        setListenerOnInfoWindowCloseBtn()
+        setCustomInfoWindowAdapter()
+    }
+
+    private fun initInfoWindowElements() {
         // MapWrapperLayout initialization
         // 39 - default marker height
         // 20 - offset between the default InfoWindow bottom edge and it's content bottom edge
         binding.mapFrameLayout.init(mMap, getPixelsFromDp(this, (39 + 20).toFloat()))
 
-
         infoWindow = layoutInflater.inflate(R.layout.info_window_layout, null) as ViewGroup?
-        btn_route = infoWindow?.findViewById(R.id.btn_route) as ImageButton
-        btn_close = infoWindow?.findViewById(R.id.btn_close) as ImageButton
-        tv_name = infoWindow?.findViewById(R.id.tv_name)!!
-        tv_adress = infoWindow?.findViewById(R.id.tv_adress)!!
-        tv_city = infoWindow?.findViewById(R.id.tv_city)!!
-        tv_county = infoWindow?.findViewById(R.id.tv_county)!!
-        tv_phone = infoWindow?.findViewById(R.id.tv_phone)!!
-        tv_hours = infoWindow?.findViewById(R.id.tv_hours)!!
+        btnRoute = infoWindow?.findViewById(R.id.btn_route) as ImageButton
+        btnClose = infoWindow?.findViewById(R.id.btn_close) as ImageButton
+        tvName = infoWindow?.findViewById(R.id.tv_name)!!
+        tvAdress = infoWindow?.findViewById(R.id.tv_adress)!!
+        tvCity = infoWindow?.findViewById(R.id.tv_city)!!
+        tvCounty = infoWindow?.findViewById(R.id.tv_county)!!
+        tvPhone = infoWindow?.findViewById(R.id.tv_phone)!!
+        tvHours = infoWindow?.findViewById(R.id.tv_hours)!!
+    }
 
-        mMap.uiSettings.isZoomControlsEnabled = true
-        mMap.setOnCameraIdleListener(this)
-        mMap.setOnMarkerClickListener(this)
-        // mMap.setInfoWindowAdapter(MyInfoWindowAdapter(this, shownBetshops))
-        mMap.setOnInfoWindowCloseListener(this)
+    @SuppressLint("PotentialBehaviorOverride")
+    private fun setCustomInfoWindowAdapter() {
+        mMap.setInfoWindowAdapter(object : InfoWindowAdapter {
+            override fun getInfoWindow(marker: Marker): View? {
+                return null
+            }
 
-        setUserLocation()
+            @RequiresApi(Build.VERSION_CODES.O)
+            override fun getInfoContents(marker: Marker): View {
+                // Setting up the infoWindow with current's marker info
+                marker.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.ic_pin_active))
 
+                (infoWindowButtonListenerRoute as OnInfoWindowElemTouchListener).setMarker(marker)
+                (infoWindowButtonListenerClose as OnInfoWindowElemTouchListener).setMarker(marker)
 
+                val nowTimeWithoutOffset = OffsetTime.now(ZoneOffset.UTC)
+                val germanNowTime = nowTimeWithoutOffset.withOffsetSameInstant(GERMAN_OFFSET)
+
+                var betshopInfo: BetshopData? = null
+                // getting betshop info by comparing currently pressed marker's location with all betshop's locations
+                for (bs in allBetshops) {
+                    if (marker.position.equals(bs.getPosition())) {
+                        betshopInfo = bs
+                    }
+                }
+
+                if (betshopInfo != null) {
+                    tvName.text = betshopInfo.name.trim()
+                    tvAdress.text = betshopInfo.address.trim()
+                    tvCity.text = betshopInfo.city.trim()
+                    tvCounty.text = betshopInfo.county.trim()
+
+                    if (germanNowTime.isAfter(START_TIME) && germanNowTime.isBefore(END_TIME)) {
+                        tvHours.text = getString(R.string.open_now, END_TIME.hour)
+                        tvHours.setTextColor(
+                            ContextCompat.getColor(
+                                this@MapsActivity,
+                                R.color.teal_200
+                            )
+                        )
+                    } else {
+                        tvHours.text = getString(R.string.opens_tomorrow, START_TIME.hour)
+                    }
+                }
+
+                // We must call this to set the current marker and infoWindow references
+                // to the MapWrapperLayout
+                binding.mapFrameLayout.setMarkerWithInfoWindow(marker, infoWindow)
+                return infoWindow!!
+            }
+        })
+    }
+
+    private fun setListenerOnInfoWindowCloseBtn() {
+        infoWindowButtonListenerClose = object : OnInfoWindowElemTouchListener(
+            btnClose,
+            ContextCompat.getDrawable(this, R.drawable.close_black),
+            ContextCompat.getDrawable(this, R.drawable.close_pressed_gray)
+        ) {
+            override fun onClickConfirmed(v: View?, marker: Marker?) {
+                marker?.hideInfoWindow()
+                marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.ic_pin_normal))
+            }
+        }
+        btnClose.setOnTouchListener(infoWindowButtonListenerClose)
+    }
+
+    private fun setListenerOnInfoWindowRouteBtn() {
         this.infoWindowButtonListenerRoute = object : OnInfoWindowElemTouchListener(
-            btn_route,
+            btnRoute,
             ContextCompat.getDrawable(this, R.drawable.route_dark),
             ContextCompat.getDrawable(this, R.drawable.route_pressed_light)
         ) {
             override fun onClickConfirmed(v: View?, marker: Marker?) {
-
-                //todo ovo sredi, marker.podaci su null!!!!!!!!!!!
-
-                Log.d(
-                    "infoWindow",
-                    "onClickConfirmed, Marker is null = " + (marker == null).toString()
-                )
-                Log.d("infoWindow", "onClickConfirmed, navigate to: ${marker?.position}")
-                Log.d("infoWindow", "onClickConfirmed, navigate to: " + marker?.position)
-
-
-                // Here we can perform some action triggered after clicking the button
+                // Getting markers location and setting navigation intent
                 val lat = marker?.position?.latitude
                 val lon = marker?.position?.longitude
 
-                val url = "waze://?ll=" + lat + ", " + lon + "&navigate=yes"
+                val url = "waze://?ll=$lat, $lon&navigate=yes"
                 val intentWaze = Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage("com.waze")
 
-                val uriGoogle = "google.navigation:q=" + lat + "," + lon
+                val uriGoogle = "google.navigation:q=$lat,$lon"
                 val intentGoogleNav = Intent(
                     Intent.ACTION_VIEW,
                     Uri.parse(uriGoogle)
@@ -231,113 +274,15 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
                 chooserIntent.resolveActivity(packageManager)?.let {
                     startActivity(chooserIntent)
                 }
-
-
-
-                Toast.makeText(this@MapsActivity, "click on button 1", Toast.LENGTH_SHORT).show()
-            }
-
-        }
-        btn_route.setOnTouchListener(infoWindowButtonListenerRoute)
-
-
-        infoWindowButtonListenerClose = object : OnInfoWindowElemTouchListener(
-            btn_close,
-            ContextCompat.getDrawable(this, R.drawable.close_black),
-            ContextCompat.getDrawable(this, R.drawable.close_pressed_gray)
-        ) {
-            override fun onClickConfirmed(v: View?, marker: Marker?) {
-                Log.d(
-                    "infoWindow",
-                    "onClickConfirmed, btn CLOSE, v==null " + (v == null) + " marker==null " + (marker?.position)
-                )
-                marker?.hideInfoWindow()
-                marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.ic_pin_normal))
-                Toast.makeText(this@MapsActivity, "click on button 2", Toast.LENGTH_SHORT).show()
             }
         }
-        btn_close.setOnTouchListener(infoWindowButtonListenerClose)
-
-
-        mMap.setInfoWindowAdapter(object : InfoWindowAdapter {
-            override fun getInfoWindow(marker: Marker): View? {
-                return null
-            }
-
-            @RequiresApi(Build.VERSION_CODES.O)
-            override fun getInfoContents(marker: Marker): View {
-                // Setting up the infoWindow with current's marker info
-
-                marker.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.ic_pin_active))
-
-                (infoWindowButtonListenerRoute as OnInfoWindowElemTouchListener).setMarker(marker)
-                (infoWindowButtonListenerClose as OnInfoWindowElemTouchListener).setMarker(marker)
-                Log.d(
-                    "infoWindow",
-                    "getInfoContents, Marker is null = " + (marker == null).toString()
-                )
-
-
-                val nowTimeWithoutOffset = OffsetTime.now(ZoneOffset.UTC)
-                val germanNowTime = nowTimeWithoutOffset.withOffsetSameInstant(germanOffset)
-
-                var betshopInfo: BetshopData? = null
-                for (bs in allBetshops) {
-                    if (marker.position.equals(bs.getPosition())) {
-                        betshopInfo = bs
-                    }
-                }
-
-                if (betshopInfo != null) {
-                    tv_name.text = betshopInfo.name.trim()
-                    tv_adress.text = betshopInfo.address
-                    tv_city.text = betshopInfo.city
-                    tv_county.text = betshopInfo.county
-
-                    if (germanNowTime.isAfter(START_TIME) && germanNowTime.isBefore(END_TIME)) {
-                        tv_hours.text = "Open now until " + END_TIME.hour + "h"
-                        tv_hours.setTextColor(
-                            ContextCompat.getColor(
-                                this@MapsActivity,
-                                R.color.teal_200
-                            )
-                        )
-                    } else {
-                        tv_hours.text = "Opens tomorrow at " + START_TIME.hour + "h"
-                    }
-                    Log.d("hghgh", "TIME time now GE/HR: " + germanNowTime)
-                    Log.d("hghgh", "TIME time now without offset: " + nowTimeWithoutOffset)
-                    Log.d(
-                        "hghgh",
-                        "TIME until closing left hours: " + Duration.between(
-                            germanNowTime,
-                            END_TIME
-                        )
-                    )
-
-                }
-
-                // We must call this to set the current marker and infoWindow references
-                // to the MapWrapperLayout
-                Log.d("hghgh", " USER MARKER tag = " + marker.tag?.toString())
-                Log.d("hghgh", " USER MARKER tag = " + USER_TAG)
-                Log.d("hghgh", "NIJE USER MARKER = " + (!(marker.tag?.toString()).equals(USER_TAG)))
-
-                binding.mapFrameLayout.setMarkerWithInfoWindow(marker, infoWindow)
-
-                return infoWindow!!
-            }
-
-        })
-
-
+        btnRoute.setOnTouchListener(infoWindowButtonListenerRoute)
     }
 
     private fun getPixelsFromDp(context: Context, dp: Float): Int {
         val scale: Float = context.resources.displayMetrics.density
         return (dp * scale + 0.5f).toInt()
     }
-
 
     /**
      * Enables the My Location layer if the fine location permission has been granted.
@@ -351,70 +296,38 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
             mMap.isMyLocationEnabled = true
             mMap.uiSettings.isMyLocationButtonEnabled = true
 
-
             /*
            * Permission granted, moveCamera to current location and zoom in
      * Get the best and most recent location of the device, which may be null in rare
      * cases when a location is not available - then position to default location.
      */
-// TODO NE ZOOMIRA - POGLEDAJ JOS MALO
-            val locationResult = fusedLocationProviderClient.lastLocation
-            var lkl: Location?
-            locationResult.addOnSuccessListener(this) { location: Location? ->
-                lkl = location
 
-                if (lkl != null) {
+            val locationResult = fusedLocationProviderClient.lastLocation
+            var userLocation: Location?
+            locationResult.addOnSuccessListener(this) { location: Location? ->
+                userLocation = location
+
+                if (userLocation != null) {
                     mMap.moveCamera(
                         CameraUpdateFactory.newLatLngZoom(
-                            LatLng(lkl!!.latitude, lkl!!.longitude),
+                            LatLng(userLocation!!.latitude, userLocation!!.longitude),
                             DEFAULT_ZOOM.toFloat()
                         )
                     )
+                } else {
+                    Snackbar.make(
+                        binding.rootView,
+                        getString(R.string.no_current_location_found),
+                        Snackbar.LENGTH_SHORT
+                    ).show()
                 }
-
             }
-//                if (task != null) { lastKnownLocation : Location? ->
-//                    // Set the map's camera position to the current location of the device.
-//
-//                    mMap.moveCamera(
-//                        CameraUpdateFactory.newLatLngZoom(
-//                            LatLng(task.latitude, task.longitude),
-//                            DEFAULT_ZOOM.toFloat()
-//                        )
-//                    )
-//
-//                    Log.d(
-//                        "lokacija",
-//                        "userova lokacija1 - permitted, should be zoomed " + task
-//                    )
-//
-////                    currentMapScreen = mMap.projection.visibleRegion.latLngBounds
-////                    getBetshopsFromApi(getBoundingBox(currentMapScreen))
-//
-//                } else {
-//                    //  Toast.makeText(this, "No current location found", Toast.LENGTH_LONG).show()
-//                    Log.d(
-//                        "lokacija",
-//                        "permitted user location, but didn't get it, - ne bi se trebalo desit"
-//                    )
-//                }
-//                Log.d(
-//                    "lokacija",
-//                    "userova lokacija4 - " + lastKnownLocation
-//                )
-
-            Log.d(
-                "lokacija",
-                "userova lokacija5 -  "
-            )
         } else {
             // Permission to access the location is missing. Show rationale and request permission
             requestPermission(
                 this, LOCATION_PERMISSION_REQUEST_CODE,
                 Manifest.permission.ACCESS_FINE_LOCATION, false
             )
-
-            Log.d("lokacija", "setUserLocation() neda permitt ")
         }
     }
 
@@ -441,293 +354,144 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
             // Display the missing permission error dialog when the fragments resume.
             permissionDenied = true
 
-            // todo Add a marker in Munich and move the camera - set blue dot, not marker
+            // add a marker in Munich and move the camera
             val userMarker =
-                mMap.addMarker(MarkerOptions().position(DEFAULT_LOCATION).title("Marker in Munich"))
+                mMap.addMarker(MarkerOptions().position(DEFAULT_LOCATION))
             userMarker!!.tag = USER_TAG
+
             mMap.moveCamera(
                 CameraUpdateFactory.newLatLngZoom(
                     DEFAULT_LOCATION,
                     DEFAULT_ZOOM.toFloat()
-                    //  7f
                 )
             )
-            Log.d("lokacija", "Munich lokacija")
-//            currentMapScreen = mMap.projection.visibleRegion.latLngBounds
-//            getBetshopsFromApi(getBoundingBox(currentMapScreen))
-            // todo vidi jel treba otkomentirati ovo nize, mislim da ne
-            // permissionDenied = false
         }
-    }
-
-    //todo ovo mi ili ne treba ili staviti negdje drugdje
-//    override fun onResumeFragments() {
-//        super.onResumeFragments()
-//        if (permissionDenied) {
-//            // Permission was not granted, display error dialog.
-//            showMissingPermissionError()
-//            permissionDenied = false
-//        }
-//    }
-
-    private fun showMissingPermissionError() {
-        newInstance(false).show(supportFragmentManager, "dialog")
     }
 
     private fun getBetshopsFromApi() {
-        Log.d("hghgh", "Activity boundingBox: ")
         viewModel.setLanLonMapView(GERMANY_BOUNDING_BOX)
-        //todo check internet connection
         viewModel.res.observe(this, { betshopResource ->
             when (betshopResource.status) {
+
                 Status.SUCCESS -> {
-
-
                     binding.btnRetry.visibility = View.GONE
-                    Log.d("hghgh", "activity success")
-                    Log.d(
-                        "hghgh",
-                        "activity success -> betshopResource.count = " + (betshopResource.data?.betshops?.size     // 11611
-                                )
-                    )    // 11611
-                    //todo set visibilities
-//                    if (betshopResource.data != null) {
-//                        allBetshops = betshopResource.data.betshopsData
-//                    }
-
                     betshopResource.data?.let {
                         if (it.betshops.isNotEmpty()) {
-                            Log.d("hghgh", "activity success -> tu sam")
-//                            Log.d(
-//                                "hghgh",
-//                                "activity success -> it.betshopsData.size" + (it.betshopsData.size)    // 0
-//                            )
                             allBetshops = it.betshops
+                            // when we have all betshops data -> calling showMarkersBasedOnZoomLevel()
                             showMarkersBasedOnZoomLevel()
                             Snackbar.make(
                                 binding.rootView,
-                                "Betshops are set",
+                                getString(R.string.betshops_are_set),
                                 Snackbar.LENGTH_SHORT
                             ).show()
-//
-
                         } else {
-                            Log.d("hghgh", "activity success - lista prazna ")
+                            // Status.SUCCESS but empty list
+                            Snackbar.make(
+                                binding.rootView,
+                                getString(R.string.empty_betshop_list),
+                                Snackbar.LENGTH_SHORT
+                            ).show()
                         }
-
                     }
-//                   if (betshopResource.data!!.betshopsData.isNotEmpty()) {
-//                       allBetshops.addAll(betshopResource.data.betshopsData)
-//                       showMarkersBasedOnZoomLevel()
-//                       Log.d("hghgh", "activity success -> allBetshops.size " + allBetshops.size)
-//                   } else {
-//                            Log.d("hghgh", "activity success - lista prazna ")
-//                        }
-                    //-------------------------------------------------------
-//                    betshopResource.data?.let { res ->
-//                        if (res.betshopsData.isNotEmpty()) {
-//                            allBetshops.addAll(res.betshopsData)
-//                            // val noMarkersAtCurrentScreen = ArrayList<BetshopData>()
-//                            // showBetshops(allBetshops)
-//                            showMarkersBasedOnZoomLevel()
-//
-//                            Log.d("hghgh", "activity success: " + allBetshops.size)
-//                        } else {
-//                            Log.d("hghgh", "activity success - lista prazna ")
-//                        }
-//                    }
                 }
+
                 Status.LOADING -> {
-                    // nothing here
-                    Log.d("hghgh", "activity loading")
                     binding.btnRetry.visibility = View.GONE
                 }
-                Status.ERROR -> {
-                    //todo set visibilities
-                    binding.btnRetry.visibility = View.VISIBLE
 
-//                    val noInternetAlertDialog = AlertDialog.Builder(this)
-//                    noInternetAlertDialog.setMessage("Can't provide data - " + betshopResource.message)
-//                        .setPositiveButton(android.R.string.ok) { dialog, id ->
-//                            dialog.cancel()
-//                        }
-//                    val alert = noInternetAlertDialog.create()
-//                    alert.show()
+                Status.ERROR -> {
+                    binding.btnRetry.visibility = View.VISIBLE
 
                     Snackbar.make(
                         binding.rootView,
-                        "Can't provide data - " + betshopResource.message,
+                        getString(R.string.cant_provide_data, betshopResource.message),
                         Snackbar.LENGTH_SHORT
                     ).show()
-
-                    Log.d("hghgh", "activity error; allBetshops are hardcoded")
-                    Log.d("hghgh", "activity error -> " + betshopResource.message)
                 }
             }
         })
-        // return betShopsForShow
     }
 
-    private fun showBetshops(betShopsForShow: List<BetshopData>) {
-
-//       val img: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.ic_pin_normal)
-//        val bitmapDescriptor: BitmapDescriptor = BitmapDescriptorFactory.fromBitmap(img)
-
-        Log.d("lklklk", "showBetshops here")
-        betShopsForShow.forEach { betshop ->
-
-            val marker = mMap.addMarker(
-                MarkerOptions()
-                    .title(betshop.name)
-                    .position(LatLng(betshop.location.lat, betshop.location.lng))
-                    // .icon(bitmapDescriptor)
-                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_pin_normal))
-
-            )
-
-            markersArray.add(marker!!)
-        }
-        shownBetshops.addAll(betShopsForShow)
-        Log.d("lklklk", "shownBetshops.size = " + shownBetshops.size)
-        Log.d("lklklk", "showBetshops OVER")
-    }
-
-    private fun deleteMarkers(betShopsForDelete: List<BetshopData>) {
-        val markerArrayForDelete = ArrayList<Marker>()
-        for (betshop in betShopsForDelete) {
-            for (marker in markersArray) {
-                if (marker.position == betshop.getPosition()) {
-                    markerArrayForDelete.add(marker)
-                }
-            }
-            shownBetshops.remove(betshop)
-        }
-        for (marker in markerArrayForDelete) {
-            marker.remove()
-        }
-    }
-
+    /**
+     * 1) determine currently zoom level
+     * 2) set newList -> all betshops for current boundingBox
+     * 3) set markersOnCurrentScreen -> markers which are already on current boundingBox
+     * 4) betshopsForShow -> determine how many (and which one) markers we need to show with the help of
+     *    setBetshopsForShow() function
+     * 5) At the end we call showBetshops() function
+     */
     private fun showMarkersBasedOnZoomLevel() {
         var betshopsForShow = ArrayList<BetshopData>()
         val currentZoomLevel = mMap.cameraPosition.zoom
 
-        Log.d("lklklk", "showMarkersBasedOnZoomLevel")
-
-        //------------------------------------------------------------------
-
-        //************************* IZ oNcAMERAiDLE()*************
         newList.clear()
-        Log.d("lklklk", "showMarkersBasedOnZoomLevel - newList should be cleared: " + newList.size)
         markersOnCurrentScreen.clear()
 
-        val curScreenBB: LatLngBounds = mMap.getProjection()
-            .getVisibleRegion().latLngBounds
-        Log.d(
-            "lklklk",
-            "showMarkersBasedOnZoomLevel - allBetshops.size before filling: " + allBetshops.size
-        )
+        val curScreenBB: LatLngBounds = mMap.projection
+            .visibleRegion.latLngBounds
+
         for (bs in allBetshops) {
             if (curScreenBB.contains(bs.getPosition())) {
                 newList.add(bs)
             }
         }
-        Log.d("lklklk", "showMarkersBasedOnZoomLevel - newList.size after filling: " + newList.size)
+
         for (bs in shownBetshops) {
             if (curScreenBB.contains(bs.getPosition())) {
                 markersOnCurrentScreen.add(bs)
             }
         }
 
-//--------------------------------------------------------------------------
+        // numberOfMarkers -> how many markers (fixed number) will be shown based on zoom level
         val numberOfMarkers: Int
         when {
             currentZoomLevel <= 3f -> {
                 numberOfMarkers = zoom3AndLess
                 betshopsForShow = setBetshopsForShow(numberOfMarkers)
-                Log.d(
-                    "lklklk",
-                    "show---------------currentZoomLevel: " + currentZoomLevel + ", betshopsForShow: " + betshopsForShow.size
-                )
             }
             3f < currentZoomLevel && currentZoomLevel <= 4f -> {
                 numberOfMarkers = zoom3_4
                 betshopsForShow = setBetshopsForShow(numberOfMarkers)
-                Log.d(
-                    "lklklk",
-                    "show---------------currentZoomLevel: " + currentZoomLevel + ", betshopsForShow: " + betshopsForShow.size
-                )
             }
             4f < currentZoomLevel && currentZoomLevel <= 6f -> {
                 numberOfMarkers = zoom4_6
                 betshopsForShow = setBetshopsForShow(numberOfMarkers)
-                Log.d(
-                    "lklklk",
-                    "show---------------currentZoomLevel: " + currentZoomLevel + ", betshopsForShow: " + betshopsForShow.size
-                )
             }
             6f < currentZoomLevel && currentZoomLevel <= 7f -> {
                 numberOfMarkers = zoom6_7
                 betshopsForShow = setBetshopsForShow(numberOfMarkers)
-                Log.d(
-                    "lklklk",
-                    "show---------------currentZoomLevel: " + currentZoomLevel + ", betshopsForShow: " + betshopsForShow.size
-                )
             }
             7f < currentZoomLevel && currentZoomLevel <= 14 -> {
                 numberOfMarkers = zoom7_14
                 betshopsForShow = setBetshopsForShow(numberOfMarkers)
-                Log.d(
-                    "lklklk",
-                    "show---------------currentZoomLevel: " + currentZoomLevel + ", betshopsForShow: " + betshopsForShow.size
-                )
             }
             currentZoomLevel > 14f -> {
-                val (forDelete, fdsize) = removeBetshopsFromNewListThatAreAlreadyOnTheMap(
+                val (forDelete, _) = removeBetshopsFromNewListThatAreAlreadyOnTheMap(
                     newList,
                     shownBetshops
                 )
                 newList.removeAll(forDelete)
                 betshopsForShow = newList
-                Log.d(
-                    "lklklk",
-                    "show---------------currentZoomLevel: " + currentZoomLevel + ", betshopsForShow: " + betshopsForShow.size
-                )
             }
         }
         showBetshops(betshopsForShow)
-
     }
 
+    // algorithm for determinig number of betshops to show
     private fun setBetshopsForShow(
         numberOfMarkers: Int
     ): ArrayList<BetshopData> {
         val betshopsForShow: ArrayList<BetshopData> = arrayListOf()
         val betshopsForDelete: ArrayList<BetshopData> = arrayListOf()
-        // first entry to activity, put certain amount of markers based on zoom level
-        Log.d(
-            "lklklk",
-            "setBetshopsForShow  - markersOnCurrentScreen = " + markersOnCurrentScreen.size     //1
-        )
-
-        Log.d(
-            "lklklk",
-            "setBetshopsForShow - newList = " + newList.size        //2
-        )
 
         // 1)
+        // first entry to activity, put certain amount of markers based on zoom level
         if (markersOnCurrentScreen.size == 0 && newList.size == 0) {
-            Log.d(
-                "lklklk",
-                "setBetshopsForShow - 1) "
-            )
             return betshopsForShow
             // 2)
         } else if (markersOnCurrentScreen.size != 0 && newList.size == 0) {
             deleteMarkers(markersOnCurrentScreen)
-            Log.d(
-                "lklklk",
-                "setBetshopsForShow - 2) "
-            )
             return betshopsForShow
             // 3)
         } else if (markersOnCurrentScreen.size == 0 && newList.size != 0) {
@@ -739,25 +503,13 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
             } else {
                 betshopsForShow.addAll(newList)
             }
-            Log.d(
-                "lklklk",
-                "setBetshopsForShow - 3) "
-            )
             // 4)
         } else if (markersOnCurrentScreen.size != 0 && newList.size != 0) {
             // 4) a)
             if (markersOnCurrentScreen.size == newList.size) {
-                Log.d(
-                    "lklklk",
-                    "setBetshopsForShow - 4) a) "
-                )
                 return betshopsForShow
                 // 4) b)
             } else if (markersOnCurrentScreen.size > newList.size) {
-                Log.d(
-                    "lklklk",
-                    "setBetshopsForShow - 4) b) -> NEVER SHOULD HAPPEN"
-                )
                 mMap.clear()
                 shownBetshops.clear()
                 if (newList.size >= numberOfMarkers) {
@@ -772,17 +524,9 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
             } else if (markersOnCurrentScreen.size < newList.size) {
                 // 4) c)*
                 if (markersOnCurrentScreen.size == numberOfMarkers) {
-                    Log.d(
-                        "lklklk",
-                        "setBetshopsForShow - 4) c)* "
-                    )
                     return betshopsForShow
                     // 4) c)**
                 } else if (markersOnCurrentScreen.size < numberOfMarkers) {
-                    Log.d(
-                        "lklklk",
-                        "setBetshopsForShow - 4) c)** "
-                    )
                     val (forDelete, fdsize) = removeBetshopsFromNewListThatAreAlreadyOnTheMap(
                         newList,
                         markersOnCurrentScreen
@@ -790,30 +534,17 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
                     newList.removeAll(forDelete)
                     // 4)** #
                     if (numberOfMarkers - fdsize >= newList.size) {
-                        Log.d(
-                            "lklklk",
-                            "setBetshopsForShow - 4) c)** #"
-                        )
                         betshopsForShow.addAll(newList)
                         // 4)** ##
                     } else {
-                        Log.d(
-                            "lklklk",
-                            "setBetshopsForShow - 4) c)** ##"
-                        )
                         val randomValues =
                             List(numberOfMarkers - fdsize) { Random.nextInt(0, newList.size - 1) }
                         for (i in randomValues) {
                             betshopsForShow.add(newList[i])
                         }
                     }
-
                     // 4) c)***
                 } else if (markersOnCurrentScreen.size > numberOfMarkers) {
-                    Log.d(
-                        "lklklk",
-                        "setBetshopsForShow - 4) c)*** "
-                    )
                     val randomValues =
                         List(markersOnCurrentScreen.size - numberOfMarkers) {
                             Random.nextInt(
@@ -832,6 +563,35 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
         return betshopsForShow
     }
 
+    private fun showBetshops(betShopsForShow: List<BetshopData>) {
+        betShopsForShow.forEach { betshop ->
+            val marker = mMap.addMarker(
+                MarkerOptions()
+                    .title(betshop.name)
+                    .position(LatLng(betshop.location.lat, betshop.location.lng))
+                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_pin_normal))
+            )
+            markersArray.add(marker!!)
+        }
+        shownBetshops.addAll(betShopsForShow)
+    }
+
+    // delete some markers if there is to many of them (e.g. when zooming-out)
+    private fun deleteMarkers(betShopsForDelete: List<BetshopData>) {
+        val markerArrayForDelete = ArrayList<Marker>()
+        for (betshop in betShopsForDelete) {
+            for (marker in markersArray) {
+                if (marker.position == betshop.getPosition()) {
+                    markerArrayForDelete.add(marker)
+                }
+            }
+            shownBetshops.remove(betshop)
+        }
+        for (marker in markerArrayForDelete) {
+            marker.remove()
+        }
+    }
+
     private fun removeBetshopsFromNewListThatAreAlreadyOnTheMap(
         newList: List<BetshopData>,
         shownBetshops: ArrayList<BetshopData>
@@ -845,23 +605,21 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
         return Pair(forDelete, forDelete.size)
     }
 
+    // repeat whole process
     override fun onCameraIdle() {
-        Log.d("lklklk", "onCameraIdle here")
-
         if (allBetshops.size != 0 || allBetshops.isNotEmpty()) {
             showMarkersBasedOnZoomLevel()
         }
     }
 
-
+    // if closing infoWindow onTouch outside infoWindow
     override fun onInfoWindowClose(marker: Marker) {
-        Log.d("lklklk", "onInfoWindowClose")
         marker.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.ic_pin_normal))
     }
 
+    // to make userLocation marker not clickable, otherwise my custom infoWindow opens
     override fun onMarkerClick(marker: Marker): Boolean {
         return (marker.tag?.toString()).equals(USER_TAG)
     }
-
 
 }
