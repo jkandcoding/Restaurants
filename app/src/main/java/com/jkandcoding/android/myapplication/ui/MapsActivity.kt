@@ -3,7 +3,6 @@ package com.jkandcoding.android.myapplication.ui
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
@@ -31,6 +30,7 @@ import com.google.android.gms.maps.GoogleMap.InfoWindowAdapter
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
+import com.google.android.material.snackbar.Snackbar
 import com.jkandcoding.android.myapplication.R
 import com.jkandcoding.android.myapplication.databinding.ActivityMapsBinding
 import com.jkandcoding.android.myapplication.map.PermissionUtils.PermissionUtils.PermissionDeniedDialog.Companion.newInstance
@@ -191,8 +191,6 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
         mMap.setOnInfoWindowCloseListener(this)
 
         setUserLocation()
-
-
 
 
         this.infoWindowButtonListenerRoute = object : OnInfoWindowElemTouchListener(
@@ -361,42 +359,53 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
      */
 // TODO NE ZOOMIRA - POGLEDAJ JOS MALO
             val locationResult = fusedLocationProviderClient.lastLocation
+            var lkl: Location?
+            locationResult.addOnSuccessListener(this) { location: Location? ->
+                lkl = location
 
-            locationResult.addOnCompleteListener(this) { task ->
-                if (task.isSuccessful && task.result != null) {
-                    // Set the map's camera position to the current location of the device.
-                    lastKnownLocation = task.result
-
+                if (lkl != null) {
                     mMap.moveCamera(
                         CameraUpdateFactory.newLatLngZoom(
-                            LatLng(lastKnownLocation.latitude, lastKnownLocation.longitude),
+                            LatLng(lkl!!.latitude, lkl!!.longitude),
                             DEFAULT_ZOOM.toFloat()
                         )
                     )
-
-                    Log.d(
-                        "lokacija",
-                        "userova lokacija1 - permitted, should be zoomed " + lastKnownLocation
-                    )
-
-//                    currentMapScreen = mMap.projection.visibleRegion.latLngBounds
-//                    getBetshopsFromApi(getBoundingBox(currentMapScreen))
-
-                } else {
-                    //  Toast.makeText(this, "No current location found", Toast.LENGTH_LONG).show()
-                    Log.d(
-                        "lokacija",
-                        "permitted user location, but didn't get it, - ne bi se trebalo desit"
-                    )
                 }
-                Log.d(
-                    "lokacija",
-                    "userova lokacija4 - " + lastKnownLocation
-                )
+
             }
+//                if (task != null) { lastKnownLocation : Location? ->
+//                    // Set the map's camera position to the current location of the device.
+//
+//                    mMap.moveCamera(
+//                        CameraUpdateFactory.newLatLngZoom(
+//                            LatLng(task.latitude, task.longitude),
+//                            DEFAULT_ZOOM.toFloat()
+//                        )
+//                    )
+//
+//                    Log.d(
+//                        "lokacija",
+//                        "userova lokacija1 - permitted, should be zoomed " + task
+//                    )
+//
+////                    currentMapScreen = mMap.projection.visibleRegion.latLngBounds
+////                    getBetshopsFromApi(getBoundingBox(currentMapScreen))
+//
+//                } else {
+//                    //  Toast.makeText(this, "No current location found", Toast.LENGTH_LONG).show()
+//                    Log.d(
+//                        "lokacija",
+//                        "permitted user location, but didn't get it, - ne bi se trebalo desit"
+//                    )
+//                }
+//                Log.d(
+//                    "lokacija",
+//                    "userova lokacija4 - " + lastKnownLocation
+//                )
+
             Log.d(
                 "lokacija",
-                "userova lokacija5 -  " + lastKnownLocation
+                "userova lokacija5 -  "
             )
         } else {
             // Permission to access the location is missing. Show rationale and request permission
@@ -472,6 +481,8 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
         viewModel.res.observe(this, { betshopResource ->
             when (betshopResource.status) {
                 Status.SUCCESS -> {
+
+
                     binding.btnRetry.visibility = View.GONE
                     Log.d("hghgh", "activity success")
                     Log.d(
@@ -491,9 +502,15 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
 //                                "hghgh",
 //                                "activity success -> it.betshopsData.size" + (it.betshopsData.size)    // 0
 //                            )
-                            allBetshops.addAll(it.betshops)
+                            allBetshops = it.betshops
                             showMarkersBasedOnZoomLevel()
+                            Snackbar.make(
+                                binding.rootView,
+                                "Betshops are set",
+                                Snackbar.LENGTH_SHORT
+                            ).show()
 //
+
                         } else {
                             Log.d("hghgh", "activity success - lista prazna ")
                         }
@@ -529,13 +546,19 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
                     //todo set visibilities
                     binding.btnRetry.visibility = View.VISIBLE
 
-                    val noInternetAlertDialog = AlertDialog.Builder(this)
-                    noInternetAlertDialog.setMessage("Can't provide data - " + betshopResource.message)
-                        .setPositiveButton(android.R.string.ok) { dialog, id ->
-                            dialog.cancel()
-                        }
-                    val alert = noInternetAlertDialog.create()
-                    alert.show()
+//                    val noInternetAlertDialog = AlertDialog.Builder(this)
+//                    noInternetAlertDialog.setMessage("Can't provide data - " + betshopResource.message)
+//                        .setPositiveButton(android.R.string.ok) { dialog, id ->
+//                            dialog.cancel()
+//                        }
+//                    val alert = noInternetAlertDialog.create()
+//                    alert.show()
+
+                    Snackbar.make(
+                        binding.rootView,
+                        "Can't provide data - " + betshopResource.message,
+                        Snackbar.LENGTH_SHORT
+                    ).show()
 
                     Log.d("hghgh", "activity error; allBetshops are hardcoded")
                     Log.d("hghgh", "activity error -> " + betshopResource.message)
@@ -594,16 +617,21 @@ class MapsActivity : AppCompatActivity(), OnRequestPermissionsResultCallback, On
 
         //************************* IZ oNcAMERAiDLE()*************
         newList.clear()
+        Log.d("lklklk", "showMarkersBasedOnZoomLevel - newList should be cleared: " + newList.size)
         markersOnCurrentScreen.clear()
 
         val curScreenBB: LatLngBounds = mMap.getProjection()
             .getVisibleRegion().latLngBounds
+        Log.d(
+            "lklklk",
+            "showMarkersBasedOnZoomLevel - allBetshops.size before filling: " + allBetshops.size
+        )
         for (bs in allBetshops) {
             if (curScreenBB.contains(bs.getPosition())) {
                 newList.add(bs)
             }
         }
-
+        Log.d("lklklk", "showMarkersBasedOnZoomLevel - newList.size after filling: " + newList.size)
         for (bs in shownBetshops) {
             if (curScreenBB.contains(bs.getPosition())) {
                 markersOnCurrentScreen.add(bs)
